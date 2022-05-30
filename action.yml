@@ -1,0 +1,62 @@
+name: Auto-tag
+description: Automatically delete and re-release tags so that other github action modules can use something similar to carets e.g. v0.1 or v3
+inputs:
+  ref:
+    type: string
+    required: true
+    description: github.ref when workflow is triggered by x.y.z semver tag e.g. refs/tags/0.1.23
+  sha:
+    type: string
+    required: true
+    description: SHA of the tag
+
+runs:
+  using: composite
+  steps:
+    - name: Validate inputs
+      shell: bash
+      env:
+        REF: ${{ inputs.ref }}
+        SHA: ${{ inputs.sha }}
+      run: |
+        # refs/tags/0.1.23 => 0.1.23
+        TAG=$(echo $REF | cut -c 11-)
+        if [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "Valid tag $TAG"
+        else
+          echo "Invalid tag $TAG"
+          exit 1
+        fi
+        if [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "Valid sha $SHA"
+        else
+          echo "Invalid sha $SHA"
+          exit 1
+        fi
+
+    - name: Generate tag name
+      id: generate_tag_name
+      shell: bash
+      env:
+        REF: ${{ inputs.ref }}
+      run: |
+        # refs/tags/0.1.23 => 0.1.23
+        TAG=$(echo $REF | cut -c 11-)
+        [[ $TAG =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]
+        MAJOR="${BASH_REMATCH[1]}"
+        MINOR="${BASH_REMATCH[2]}"
+        PATCH="${BASH_REMATCH[3]}"
+        NEW_TAG="v${MAJOR}"
+        if [ "$MAJOR" == "0" ]; then
+          NEW_TAG=("v${MAJOR}.${MINOR}")
+        fi
+        echo "Tag is $NEW_TAG"
+        echo "::set-output name=tag::$NEW_TAG"
+
+    - name: Add tag to repo
+      uses: silverstripe/gha-tag-release@main
+      with:
+        sha: ${{ github.sha }}
+        tag: ${{ steps.generate_tag_name.outputs.tag }}
+        delete_existing: true
+        release: false
