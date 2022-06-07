@@ -14,7 +14,9 @@ Using the 'v' prefix to avoid confusion with the '2' branch naming convention th
 
 ## Usage
 
-.github/workflows/auto-tag.yml
+This action has no configuration or inputs - just add the following workflow verbatim.
+
+**.github/workflows/auto-tag.yml**
 ```yml
 on:
   push:
@@ -27,8 +29,4 @@ jobs:
     steps:
       - name: Auto-tag
         uses: silverstripe/gha-auto-tag@main
-        with:
-          ref: ${{ github.ref }}
-          sha: ${{ github.sha }}
-
 ```

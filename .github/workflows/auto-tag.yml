@@ -1,3 +1,4 @@
+name: Auto-tag
 on:
   push:
     tags:
@@ -8,7 +9,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Auto-tag
-        uses: emteknetnz/gha-auto-tag@main
-        with:
-          ref: ${{ github.ref }}
-          sha: ${{ github.sha }}
+        uses: silverstripe/gha-auto-tag@main
