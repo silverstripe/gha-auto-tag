@@ -1,0 +1,35 @@
+name: Auto-tag
+description: Automatically delete and re-release tags so that other github action modules can use something similar to carets e.g. v0.1 or v3
+
+runs:
+  using: composite
+  steps:
+
+    - name: Generate tag name
+      id: generate_tag_name
+      shell: bash
+      env:
+        GITHUB_REF: ${{ github.ref }}
+      run: |
+        # refs/tags/0.1.23 => 0.1.23
+        TAG=$(echo $GITHUB_REF | cut -c 11-)
+        if ! [[ $TAG =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+          echo "Invalid semver tag $TAG"
+          exit 1
+        fi 
+        MAJOR="${BASH_REMATCH[1]}"
+        MINOR="${BASH_REMATCH[2]}"
+        PATCH="${BASH_REMATCH[3]}"
+        NEW_TAG="v${MAJOR}"
+        if [ "$MAJOR" == "0" ]; then
+          NEW_TAG=("v${MAJOR}.${MINOR}")
+        fi
+        echo "Tag is $NEW_TAG"
+        echo "::set-output name=tag::$NEW_TAG"
+
+    - name: Add tag to repo
+      uses: silverstripe/gha-tag-release@main
+      with:
+        tag: ${{ steps.generate_tag_name.outputs.tag }}
+        delete_existing: true
+        release: false
