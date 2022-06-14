@@ -28,5 +28,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Auto-tag
-        uses: silverstripe/gha-auto-tag@main
+        uses: silverstripe/gha-auto-tag@v1
 ```

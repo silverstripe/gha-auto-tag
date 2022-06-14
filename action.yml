@@ -28,7 +28,7 @@ runs:
         echo "::set-output name=tag::$NEW_TAG"
 
     - name: Add tag to repo
-      uses: silverstripe/gha-tag-release@main
+      uses: silverstripe/gha-tag-release@v1
       with:
         tag: ${{ steps.generate_tag_name.outputs.tag }}
         delete_existing: true
