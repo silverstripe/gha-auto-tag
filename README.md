@@ -18,10 +18,13 @@ This action has no configuration or inputs - just add the following workflow ver
 
 **.github/workflows/auto-tag.yml**
 ```yml
+name: Auto-tag
+
 on:
   push:
     tags:
       - '*.*.*'
+
 jobs:
   auto-tag:
     name: Auto-tag
