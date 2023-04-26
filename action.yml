@@ -25,7 +25,7 @@ runs:
           NEW_TAG=("v${MAJOR}.${MINOR}")
         fi
         echo "Tag is $NEW_TAG"
-        echo "::set-output name=tag::$NEW_TAG"
+        echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
 
     - name: Add tag to repo
       uses: silverstripe/gha-tag-release@v1
