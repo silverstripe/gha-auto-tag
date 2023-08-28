@@ -5,6 +5,12 @@ runs:
   using: composite
   steps:
 
+    - name: Checkout code
+      uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      with:
+        fetch-depth: 0
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+
     - name: Install PHP
       uses: shivammathur/setup-php@1a18b2267f80291a81ca1d33e7c851fe09e7dfc4 # v2.22.0
       with:
@@ -22,12 +28,17 @@ runs:
         TAG=""
         if [[ $GITHUB_EVENT_NAME == 'tag' ]]; then
           # Use the current tag name the workflow was triggered on
+          echo "Getting tag from github.ref"
           TAG=$(echo $GITHUB_REF | cut -c 11-)
           if ! [[ $TAG =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
             echo "Invalid semver tag $TAG"
             exit 1
           fi
+          echo "TAG is $TAG"
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
         else
+          echo "Getting tag from github api"
           # Find the highest semver tag on repo
           # Gets 100 most recently created tags from GitHub API
           # https://docs.github.com/en/rest/git/tags?apiVersion=2022-11-28
@@ -58,22 +69,28 @@ runs:
               cat __tags.json
               exit 1
           fi
+          echo "TAG is $TAG"
           [[ $TAG =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]
+          # Ensure we are on the correct branch prior to tagging
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          git checkout $MAJOR.$MINOR
+          if [[ $? != 0 ]]; then
+              echo "Branch $MAJOR.$MINOR does not exist"
+              exit 1
+          fi
         fi
-        MAJOR="${BASH_REMATCH[1]}"
-        MINOR="${BASH_REMATCH[2]}"
-        PATCH="${BASH_REMATCH[3]}"
         NEW_TAG="v${MAJOR}"
         if [ "$MAJOR" == "0" ]; then
           NEW_TAG=("v${MAJOR}.${MINOR}")
         fi
-        echo "Tag is $NEW_TAG"
-        echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+        echo "NEW_TAG is $NEW_TAG"
+        echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
 
     - name: Add tag to repo
       uses: silverstripe/gha-tag-release@v1
       with:
-        tag: ${{ steps.generate_tag_name.outputs.tag }}
+        tag: ${{ steps.generate_tag_name.outputs.new_tag }}
         delete_existing: true
         release: false
 
