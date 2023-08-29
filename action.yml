@@ -5,31 +5,99 @@ runs:
   using: composite
   steps:
 
+    - name: Checkout code
+      uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      with:
+        fetch-depth: 0
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+
+    - name: Install PHP
+      uses: shivammathur/setup-php@1a18b2267f80291a81ca1d33e7c851fe09e7dfc4 # v2.22.0
+      with:
+        php-version: 8.1
+
     - name: Generate tag name
       id: generate_tag_name
       shell: bash
       env:
         GITHUB_REF: ${{ github.ref }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
       run: |
         # refs/tags/0.1.23 => 0.1.23
-        TAG=$(echo $GITHUB_REF | cut -c 11-)
-        if ! [[ $TAG =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-          echo "Invalid semver tag $TAG"
-          exit 1
-        fi 
-        MAJOR="${BASH_REMATCH[1]}"
-        MINOR="${BASH_REMATCH[2]}"
-        PATCH="${BASH_REMATCH[3]}"
+        TAG=""
+        if [[ $GITHUB_EVENT_NAME == 'tag' ]]; then
+          # Use the current tag name the workflow was triggered on
+          echo "Getting tag from github.ref"
+          TAG=$(echo $GITHUB_REF | cut -c 11-)
+          if ! [[ $TAG =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "Invalid semver tag $TAG"
+            exit 1
+          fi
+          echo "TAG is $TAG"
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+        else
+          echo "Getting tag from github api"
+          # Find the highest semver tag on repo
+          # Gets 100 most recently created tags from GitHub API
+          # https://docs.github.com/en/rest/git/tags?apiVersion=2022-11-28
+          RESP_CODE=$(curl -w %{http_code} -s -o __tags.json \
+          -X GET "https://api.github.com/repos/$GITHUB_REPOSITORY/tags?per_page=100" \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer ${{ github.token }}" \
+          -H "X-GitHub-Api-Version: 2022-11-28")
+          if [[ $RESP_CODE != "200" ]]; then
+              echo "Unable to read list of tags - HTTP response code was $RESP_CODE"
+              cat __tags.json
+              exit 1
+          fi
+          # Get highest semver tag from list
+          TAG=$(php -r '
+              $json = json_decode(file_get_contents("__tags.json"), true);
+              $tags = [];
+              foreach ($json as $record) {
+                  if (preg_match("#^[0-9]+\.[0-9]+\.[0-9]+$#", $record["name"])) {
+                      $tags[] = $record["name"];
+                  }
+              }
+              usort($tags, "version_compare");
+              echo $tags[count($tags) - 1] ?? "";
+          ')
+          if [[ $TAG == "" ]]; then
+              echo "Unable to find any semver tags on repo"
+              cat __tags.json
+              exit 1
+          fi
+          echo "TAG is $TAG"
+          [[ $TAG =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]
+          # Ensure we are on the correct branch prior to tagging
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          git checkout $MAJOR.$MINOR
+          if [[ $? != 0 ]]; then
+              echo "Branch $MAJOR.$MINOR does not exist"
+              exit 1
+          fi
+        fi
         NEW_TAG="v${MAJOR}"
         if [ "$MAJOR" == "0" ]; then
           NEW_TAG=("v${MAJOR}.${MINOR}")
         fi
-        echo "Tag is $NEW_TAG"
-        echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+        echo "NEW_TAG is $NEW_TAG"
+        echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
 
     - name: Add tag to repo
       uses: silverstripe/gha-tag-release@v1
       with:
-        tag: ${{ steps.generate_tag_name.outputs.tag }}
+        tag: ${{ steps.generate_tag_name.outputs.new_tag }}
         delete_existing: true
         release: false
+
+    - name: Delete temporary files
+      shell: bash
+      if: always()
+      run: |
+        if [[ -f __tags.json ]]; then
+          rm __tags.json
+        fi
