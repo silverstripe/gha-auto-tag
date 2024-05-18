@@ -26,10 +26,14 @@ on:
       - '*.*.*'
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   auto-tag:
     name: Auto-tag
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Auto-tag
         uses: silverstripe/gha-auto-tag@v1
