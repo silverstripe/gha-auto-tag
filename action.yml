@@ -88,8 +88,9 @@ runs:
         echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
 
     - name: Add tag to repo
-      uses: silverstripe/gha-tag-release@v1
+      uses: silverstripe/gha-tag-release@v2
       with:
+        skip_gauge_release: true
         tag: ${{ steps.generate_tag_name.outputs.new_tag }}
         delete_existing: true
         release: false
