@@ -18,9 +18,11 @@ jobs:
     if: (github.event_name == 'schedule' && github.repository_owner == 'silverstripe') || (github.event_name != 'schedule')
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       contents: write
     steps:
       - name: Tag release
         uses: silverstripe/gha-tag-release@v2
         with:
           latest_local_sha: ${{ inputs.latest_local_sha }}
+          dispatch_gha_autotag: true
