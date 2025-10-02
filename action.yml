@@ -24,6 +24,7 @@ runs:
         GITHUB_REPOSITORY: ${{ github.repository }}
         GITHUB_EVENT_NAME: ${{ github.event_name }}
       run: |
+        echo "GITHUB_REF is $GITHUB_REF"
         # refs/tags/0.1.23 => 0.1.23
         TAG=""
         if [[ $GITHUB_EVENT_NAME == 'push' ]]; then
@@ -38,6 +39,19 @@ runs:
           MAJOR="${BASH_REMATCH[1]}"
           MINOR="${BASH_REMATCH[2]}"
         else
+          # Try and determine the major branch from the github ref e.g. 1.16, or refs/heads/1.16
+          MAJOR_BRANCH=""
+          if [[ $GITHUB_REF =~ ^([0-9]+)\.[0-9]+$ ]]; then
+            MAJOR_BRANCH="${BASH_REMATCH[1]}"
+          elif [[ $GITHUB_REF =~ ^refs/heads/([0-9]+)\.[0-9]+$ ]]; then
+            MAJOR_BRANCH="${BASH_REMATCH[1]}"
+          fi
+          echo "MAJOR_BRANCH is $MAJOR_BRANCH"
+          MAJOR_RX="[0-9]+"
+          if [[ $MAJOR_BRANCH != "" ]]; then
+            MAJOR_RX="$MAJOR_BRANCH"
+          fi
+          echo "MAJOR_RX is $MAJOR_RX"
           echo "Getting tag from github api"
           # Find the highest semver tag on repo
           # Gets 100 most recently created tags from GitHub API
@@ -53,11 +67,12 @@ runs:
               exit 1
           fi
           # Get highest semver tag from list
-          TAG=$(php -r '
+          TAG=$(MAJOR_RX="$MAJOR_RX" php -r '
+              $major_rx = getenv("MAJOR_RX");
               $json = json_decode(file_get_contents("__tags.json"), true);
               $tags = [];
               foreach ($json as $record) {
-                  if (preg_match("#^[0-9]+\.[0-9]+\.[0-9]+$#", $record["name"])) {
+                  if (preg_match("#^{$major_rx}\.[0-9]+\.[0-9]+$#", $record["name"])) {
                       $tags[] = $record["name"];
                   }
               }
@@ -70,7 +85,7 @@ runs:
               exit 1
           fi
           echo "TAG is $TAG"
-          [[ $TAG =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]
+          [[ $TAG =~ ^($MAJOR_RX)\.([0-9]+)\.([0-9]+)$ ]]
           # Ensure we are on the correct branch prior to tagging
           MAJOR="${BASH_REMATCH[1]}"
           MINOR="${BASH_REMATCH[2]}"
